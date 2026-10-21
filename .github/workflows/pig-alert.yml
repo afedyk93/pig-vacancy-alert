@@ -1,0 +1,36 @@
+name: Pig vacancy alert
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (GitHub may run it a few minutes late)
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+  issues: write   # an alert opens an issue, which emails you
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore last alert
+        uses: actions/cache/restore@v4
+        with:
+          path: .pig_state.json
+          key: pig-state-${{ github.run_id }}
+          restore-keys: pig-state-
+
+      - name: Check The Pig
+        run: python3 check_pig.py
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save last alert
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .pig_state.json
+          key: pig-state-${{ github.run_id }}
