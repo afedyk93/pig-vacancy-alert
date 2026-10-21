@@ -20,6 +20,7 @@ import urllib.request
 # ---------------------------------------------------------------- settings
 HOTEL_ID = "PVP"  # THE PIG-in the Cotswolds
 ADULTS = 2
+CHILDREN = 1  # the baby; every room must fit 2 adults + 1 child
 TRIP_START = dt.date(2026, 12, 18)
 TRIP_END = dt.date(2026, 12, 23)  # check-out day
 
@@ -28,6 +29,7 @@ BOOK_URL = (f"https://book.thepighotel.com/book/?type=stay&loc={HOTEL_ID}"
             f"&guests={ADULTS}&dates={TRIP_START}_{TRIP_END}")
 PHONE = "0345 225 9494"
 STATUS_TITLE = f"Live status: The Pig, {TRIP_START:%b %-d} to {TRIP_END:%b %-d}"
+PARTY = f"{ADULTS} adults + {CHILDREN} child" if CHILDREN else f"{ADULTS} adults"
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GH_REPO = os.environ.get("GITHUB_REPOSITORY", "")
@@ -53,7 +55,7 @@ def windows():
 
 def fetch(start, end):
     url = (f"{FEED}?hotel_id={HOTEL_ID}&start={start}&end={end}"
-           f"&room_qty=1&adults={ADULTS}")
+           f"&room_qty=1&adults={ADULTS}&children={CHILDREN}")
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
@@ -164,15 +166,15 @@ def main():
 
     # Live status board (no email)
     if whole in found:
-        headline = "**The whole stay is OPEN. Book now.**"
+        headline = f"**The whole stay is OPEN for {PARTY}. Book now.**"
     elif found:
-        headline = "Whole stay still full. These pieces are open:"
+        headline = f"Whole stay still full for {PARTY}. These pieces are open:"
     else:
-        headline = "Everything full for these dates."
+        headline = f"Nothing open for {PARTY} on any of these dates."
     rows = [f"- {line(s, e, r)}" for (s, e), r in found.items()][:20]
     update_status(f"{headline}\n\n" + "\n".join(rows) +
-                  f"\n\nLast checked {now}. Checks every 15 minutes.\n"
-                  f"Book: {BOOK_URL}\nPhone: {PHONE} (they can split a stay across rooms)")
+                  f"\n\nSearching for {PARTY}. Last checked {now}. Checks every 15 minutes.\n"
+                  f"Book: {BOOK_URL} (set guests to {PARTY})\nPhone: {PHONE} (ask about a cot; they can also split a stay across rooms)")
 
     # Email only when something opens that wasn't open last time
     if "open" not in state:
