@@ -14,6 +14,7 @@ import datetime as dt
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -54,11 +55,19 @@ def windows():
 
 
 def fetch(start, end):
+    """Ask The Pig's booking feed, retrying a couple of times on blips."""
     url = (f"{FEED}?hotel_id={HOTEL_ID}&start={start}&end={end}"
            f"&room_qty=1&adults={ADULTS}&children={CHILDREN}")
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r)
+        except (urllib.error.URLError, ValueError, TimeoutError) as e:
+            if attempt == 2:
+                raise
+            print(f"Retrying {start} to {end} after: {e}")
+            time.sleep(10 * (attempt + 1))
 
 
 def cheapest_open(data):
@@ -151,9 +160,12 @@ def main():
         try:
             room = cheapest_open(fetch(start, end))
         except (urllib.error.URLError, ValueError, TimeoutError) as e:
-            print(f"Could not check {start} to {end}: {e}")
+            streak = state.get("fail_streak", 0) + 1
+            state["fail_streak"] = streak
+            print(f"Could not check {start} to {end}: {e} (failure {streak} in a row)")
             save_state(state)
-            return 1  # a failed run makes GitHub email you
+            # Only fail the run (which makes GitHub email you) after 3 bad checks in a row.
+            return 1 if streak >= 3 else 0
         print(f"{label(start, end)}: {room[0] if room else 'full'}")
         if room:
             found[(start, end)] = room
@@ -187,6 +199,7 @@ def main():
             alert(title, body + f"\n\nBook online or call {PHONE}.", loud)
 
     state["open"] = sorted(keys)
+    state["fail_streak"] = 0
     state["last_check"] = now
     save_state(state)
     return 0
