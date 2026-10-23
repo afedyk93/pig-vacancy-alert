@@ -100,15 +100,13 @@ def gh(method, path, body=None):
         return json.load(r)
 
 
+STATUS_ISSUE = 2  # the one Live status issue; edited each run (edits send no email)
+
+
 def update_status(body):
-    """Edit the single Live status issue (edits don't email); create it once if missing."""
+    """Edit the Live status issue. Never creates issues, so it can't spam you."""
     try:
-        issues = gh("GET", "/issues?state=open&per_page=100") or []
-        mine = [i for i in issues if i.get("title") == STATUS_TITLE]
-        if mine:
-            gh("PATCH", f"/issues/{mine[0]['number']}", {"body": body})
-        elif GH_TOKEN:
-            gh("POST", "/issues", {"title": STATUS_TITLE, "body": body})
+        gh("PATCH", f"/issues/{STATUS_ISSUE}", {"body": body, "state": "open"})
     except urllib.error.URLError as e:
         print("Status update failed:", e)
 
